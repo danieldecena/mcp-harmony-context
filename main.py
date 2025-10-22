@@ -33,40 +33,66 @@ def get_script_path() -> Path:
     return get_harmony_help_path() / "script"
 
 
-def get_available_classes() -> List[str]:
-    """Get list of all available API class names from the script folder."""
-    script_path = get_script_path()
+def get_available_classes() -> List[dict]:
+    """Get list of all available API classes with descriptions from annotated.html.
 
-    if not script_path.exists():
+    Returns:
+        List of dicts with 'name' and 'description' keys.
+    """
+    script_path = get_script_path()
+    annotated_file = script_path / "annotated.html"
+
+    if not annotated_file.exists():
         return []
 
-    class_names = []
-    # Find all class*.html files, excluding *-members.html files
-    for html_file in script_path.glob("class*.html"):
-        filename = html_file.name
-        # Skip member files
-        if "-members.html" in filename:
-            continue
-        # Extract class name from filename (remove "class" prefix and ".html" suffix)
-        class_name = filename[5:-5]  # Remove "class" and ".html"
-        class_names.append(class_name)
+    try:
+        html_content = annotated_file.read_text(encoding="utf-8")
+        soup = BeautifulSoup(html_content, 'html.parser')
 
-    return sorted(class_names)
+        classes = []
 
+        # Find all table rows in the class list
+        table = soup.find('table', class_='directory')
+        if not table:
+            return []
 
-@mcp.resource("harmony://config/help-path")
-def get_help_path() -> str:
-    """Get the configured Harmony help documentation path"""
-    path = get_harmony_help_path()
-    exists = path.exists()
-    return f"Path: {path}\nExists: {exists}"
+        for row in table.find_all('tr'):
+            # Find the class name link
+            link = row.find('a', class_='el')
+            if not link:
+                continue
+
+            class_name = link.get_text(strip=True)
+
+            # Find the description
+            desc_td = row.find('td', class_='desc')
+            if desc_td:
+                # Convert HTML to text
+                h = html2text.HTML2Text()
+                h.ignore_links = True
+                h.ignore_images = True
+                h.ignore_emphasis = False
+                h.body_width = 0
+                description = h.handle(str(desc_td)).strip()
+            else:
+                description = ""
+
+            classes.append({
+                'name': class_name,
+                'description': description
+            })
+
+        return sorted(classes, key=lambda x: x['name'].lower())
+
+    except Exception as e:
+        return []
 
 
 @mcp.resource("harmony://api/classes")
 def get_classes() -> str:
-    """Get list of all available Harmony API classes.
+    """Get list of all available Harmony API classes with descriptions.
 
-    Returns a list of class names that can be queried for documentation.
+    Returns a list of class names and brief descriptions that can be queried for full documentation.
     """
     classes = get_available_classes()
 
@@ -74,10 +100,20 @@ def get_classes() -> str:
         script_path = get_script_path()
         return f"No classes found. Please check that the script path exists: {script_path}"
 
-    # Return as formatted list
-    result = f"Available Harmony API Classes ({len(classes)} total):\n\n"
-    result += "\n".join(f"  - {class_name}" for class_name in classes)
-    result += f"\n\nTo get documentation for a class, use: harmony://api/class/{{className}}"
+    # Return as formatted list with descriptions
+    result = f"# Available Harmony API Classes ({len(classes)} total)\n\n"
+
+    for class_info in classes:
+        name = class_info['name']
+        desc = class_info['description']
+
+        if desc:
+            result += f"## {name}\n{desc}\n\n"
+        else:
+            result += f"## {name}\n\n"
+
+    result += "\n---\n\n"
+    result += "To get full documentation for a specific class, use: `harmony://api/class/{className}`\n"
 
     return result
 
@@ -103,12 +139,12 @@ def get_class_documentation(class_name: str) -> str:
     if not html_file.exists():
         # Try to find similar class names for helpful error message
         available = get_available_classes()
-        similar = [c for c in available if class_name.lower() in c.lower()]
+        similar = [c for c in available if class_name.lower() in c['name'].lower()]
 
         error_msg = f"Error: Class '{class_name}' not found.\n\n"
         if similar:
             error_msg += f"Did you mean one of these?\n"
-            error_msg += "\n".join(f"  - {c}" for c in similar[:5])
+            error_msg += "\n".join(f"  - {c['name']}: {c['description'][:80]}..." if len(c['description']) > 80 else f"  - {c['name']}: {c['description']}" for c in similar[:5])
         else:
             error_msg += f"Use harmony://api/classes to see all available classes."
 

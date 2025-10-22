@@ -1,0 +1,12 @@
+[project]
+name = "mcp-harmony-context"
+version = "0.1.0"
+description = "MCP server for providing context about Harmony and their API"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp[cli]>=1.18.0",
+    "python-dotenv>=1.0.0",
+    "beautifulsoup4>=4.12.0",
+    "html2text>=2024.2.26",
+]

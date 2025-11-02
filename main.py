@@ -33,6 +33,11 @@ def get_script_path() -> Path:
     return get_harmony_help_path() / "script"
 
 
+def get_scripts_demo_path() -> Path:
+    """Get the scripts demo folder path."""
+    return get_harmony_help_path() / "extended" / "ScriptAPIDemos"
+
+
 def get_available_classes() -> List[dict]:
     """Get list of all available API classes with descriptions from annotated.html.
 
@@ -177,6 +182,26 @@ def get_class_documentation(class_name: str) -> str:
 
     except Exception as e:
         return f"Error reading file {html_file}: {str(e)}"
+
+
+@mcp.resource("harmony://config/scripts-demo-path")
+def get_scripts_demo_path_resource() -> str:
+    """Get the path to the Harmony scripts demo folder.
+
+    Returns the configured path to the ScriptAPIDemos folder and whether it exists.
+    """
+    scripts_demo_path = get_scripts_demo_path()
+    exists = scripts_demo_path.exists()
+
+    result = f"# Harmony Scripts Demo Path\n\n"
+    result += f"**Path:** `{scripts_demo_path}`\n\n"
+    result += f"**Exists:** {'Yes' if exists else 'No'}\n\n"
+
+    if not exists:
+        result += "⚠️ **Warning:** The scripts demo path does not exist. "
+        result += "Please check your HARMONY_HELP_PATH configuration.\n"
+
+    return result
 
 
 if __name__ == "__main__":

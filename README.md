@@ -6,7 +6,7 @@ An MCP (Model Context Protocol) server that provides context about Toon Boom Har
 
 ## Author
 
-**Claude**
+**Jorge Hernandez Ibañez**
 Copyright (c) 2025
 
 ## License
@@ -47,15 +47,9 @@ The following Python packages are required:
 
 ## Installation
 
-### 1. Install uv (if not already installed)
+### 1. Install uv (recomended)
 
-```bash
-# On macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# On Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
+We recommend using [uv](https://docs.astral.sh/uv/) to manage the mcp project.
 
 ### 2. Clone the repository
 
@@ -82,7 +76,20 @@ pip install "mcp[cli]>=1.18.0" python-dotenv beautifulsoup4 html2text
 
 The server needs to know where your Harmony help documentation is located.
 
-**Option 1: Environment Variable**
+**Option 1: .env File (recomended)**
+
+Create a `.env` file in the project root:
+
+```bash
+HARMONY_HELP_PATH=C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help
+```
+
+**Default Path**: If not configured, the server defaults to:
+`C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help`
+
+---
+
+**Option 2: Environment Variable**
 
 Set the `HARMONY_HELP_PATH` environment variable:
 
@@ -96,19 +103,6 @@ $env:HARMONY_HELP_PATH="C:\Program Files (x86)\Toon Boom Animation\Toon Boom Har
 # macOS/Linux
 export HARMONY_HELP_PATH="/Applications/Toon Boom Harmony/help"
 ```
-
-**Option 2: .env File**
-
-Create a `.env` file in the project root:
-
-```bash
-HARMONY_HELP_PATH=C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help
-```
-
-**Default Path**: If not configured, the server defaults to:
-`C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help`
-
----
 
 ## Usage
 
@@ -306,7 +300,8 @@ Contributions are welcome! Please feel free to submit issues, fork the repositor
 
 ## Support
 
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/yourusername/mcp-harmony-context).
+For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/jorgehi/mcp-harmony-context).
+Developer contact: [info@jorgehi.com](mailto:info@jorgehi.com)
 
 ---
 

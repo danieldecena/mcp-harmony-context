@@ -207,6 +207,95 @@ def get_scripts_demo_path_resource() -> str:
     return result
 
 
+@mcp.tool()
+def get_class_docs(class_name: str) -> str:
+    """Get full documentation for a specific Harmony API class.
+
+    Args:
+        class_name: Name of the class (e.g., "Action", "Color", "scene")
+    """
+    return get_class_documentation(class_name)
+
+
+@mcp.tool()
+def search_api(query: str) -> str:
+    """Search across all Harmony API class names and descriptions for a keyword or concept.
+
+    Args:
+        query: Keyword or concept to search for
+    """
+    classes = get_available_classes()
+    if not classes:
+        script_path = get_script_path()
+        return f"No classes available. Check that script path exists: {script_path}"
+
+    query_lower = query.lower()
+    matches = [
+        c for c in classes
+        if query_lower in c['name'].lower() or query_lower in c['description'].lower()
+    ]
+
+    if not matches:
+        return f"No classes found matching '{query}'."
+
+    result = f"# Search Results for '{query}' ({len(matches)} found)\n\n"
+    for c in matches:
+        desc = c['description']
+        result += f"## {c['name']}\n{desc}\n\n" if desc else f"## {c['name']}\n\n"
+    result += "---\nUse `get_class_docs(class_name)` to get full documentation for any class.\n"
+    return result
+
+
+@mcp.tool()
+def list_demo_scripts() -> str:
+    """List all available demo scripts in the Harmony ScriptAPIDemos folder."""
+    demos_path = get_scripts_demo_path()
+
+    if not demos_path.exists():
+        return f"ScriptAPIDemos folder not found at: {demos_path}"
+
+    scripts = sorted(demos_path.rglob("*.js")) + sorted(demos_path.rglob("*.zip"))
+    js_scripts = sorted(demos_path.rglob("*.js"))
+
+    if not js_scripts:
+        return f"No demo scripts found in: {demos_path}"
+
+    result = f"# Harmony Script API Demos ({len(js_scripts)} scripts)\n\n"
+    for script in js_scripts:
+        relative = script.relative_to(demos_path)
+        result += f"- `{relative}`\n"
+    result += "\n---\nUse `get_script_demo(script_name)` to read a specific script.\n"
+    return result
+
+
+@mcp.tool()
+def get_script_demo(script_name: str) -> str:
+    """Read and return the content of a specific Harmony demo script.
+
+    Args:
+        script_name: Script filename or relative path (e.g., "TB_ExportCamera.js")
+    """
+    demos_path = get_scripts_demo_path()
+
+    if not demos_path.exists():
+        return f"ScriptAPIDemos folder not found at: {demos_path}"
+
+    # Search for the script by name
+    matches = list(demos_path.rglob(script_name))
+    if not matches:
+        # Try without extension
+        matches = list(demos_path.rglob(f"{script_name}.js"))
+
+    if not matches:
+        return f"Script '{script_name}' not found. Use `list_demo_scripts()` to see available scripts."
+
+    script_file = matches[0]
+    try:
+        content = script_file.read_text(encoding="utf-8")
+        return f"# {script_file.name}\n\n```javascript\n{content}\n```"
+    except Exception as e:
+        return f"Error reading script {script_file}: {e}"
+
+
 if __name__ == "__main__":
-    # Run the MCP server
     mcp.run()

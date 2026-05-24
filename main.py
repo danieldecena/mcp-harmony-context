@@ -6,6 +6,7 @@ Licensed under the MIT License. See LICENSE file in the project root for full li
 """
 
 import os
+import platform
 from pathlib import Path
 from typing import List
 from dotenv import load_dotenv
@@ -19,12 +20,32 @@ load_dotenv()
 # Create an MCP server
 mcp = FastMCP("mcp-harmony-context")
 
-# Configuration: Harmony help documentation path
-# Set via environment variable or use default
-HARMONY_HELP_PATH = os.getenv(
-    "HARMONY_HELP_PATH",
-    r"C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help"
-)
+
+def _default_harmony_help_path() -> str:
+    """Pick a sensible default help-doc path for the host OS.
+
+    Users normally override this with HARMONY_HELP_PATH; these defaults exist
+    so the error message at startup points somewhere plausible.
+    """
+    system = platform.system()
+    if system == "Darwin":
+        # Newest install wins if several Harmony versions are present.
+        candidates = sorted(
+            Path("/Applications").glob("Toon Boom Harmony*"),
+            reverse=True,
+        )
+        for app_dir in candidates:
+            for app_bundle in app_dir.glob("*.app"):
+                help_dir = app_bundle / "Contents" / "tba" / "resources" / "help"
+                if help_dir.exists():
+                    return str(help_dir)
+        return "/Applications/Toon Boom Harmony 25 Premium/Harmony 25 Premium.app/Contents/tba/resources/help"
+    if system == "Linux":
+        return "/opt/ToonBoomAnimation/harmony/resources/help"
+    return r"C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help"
+
+
+HARMONY_HELP_PATH = os.getenv("HARMONY_HELP_PATH", _default_harmony_help_path())
 
 def get_harmony_help_path() -> Path:
     """Get the configured Harmony help documentation path."""
@@ -41,59 +62,101 @@ def get_scripts_demo_path() -> Path:
     return get_harmony_help_path() / "extended" / "ScriptAPIDemos"
 
 
+class HarmonyPathError(RuntimeError):
+    """Raised when the configured Harmony help path is missing or malformed."""
+
+
+def validate_harmony_paths() -> dict:
+    """Inspect every path the server depends on and return a diagnostic report.
+
+    The shape is stable so it can back both the diagnostics resource and the
+    startup banner. `ok` is True only when every required path resolves.
+    """
+    help_path = get_harmony_help_path()
+    script_path = get_script_path()
+    annotated = script_path / "annotated.html"
+    demos = get_scripts_demo_path()
+
+    checks = [
+        ("HARMONY_HELP_PATH", help_path, True),
+        ("script/", script_path, True),
+        ("script/annotated.html", annotated, True),
+        ("extended/ScriptAPIDemos/", demos, False),
+    ]
+    results = [
+        {"label": label, "path": str(path), "exists": path.exists(), "required": required}
+        for label, path, required in checks
+    ]
+    return {
+        "ok": all(r["exists"] for r in results if r["required"]),
+        "source": "HARMONY_HELP_PATH env var" if os.getenv("HARMONY_HELP_PATH") else "built-in default",
+        "checks": results,
+    }
+
+
+def _format_diagnostics(report: dict) -> str:
+    lines = [
+        f"**Status:** {'OK' if report['ok'] else 'MISCONFIGURED'}",
+        f"**Source:** {report['source']}",
+        "",
+        "| Required | Exists | Path |",
+        "| -------- | ------ | ---- |",
+    ]
+    for c in report["checks"]:
+        req = "yes" if c["required"] else "no"
+        exists = "yes" if c["exists"] else "no"
+        lines.append(f"| {req} | {exists} | `{c['path']}` ({c['label']}) |")
+    if not report["ok"]:
+        lines += [
+            "",
+            "Set `HARMONY_HELP_PATH` in your `.env` to the `help` folder inside your Harmony install.",
+            "On macOS this is typically:",
+            "`/Applications/Toon Boom Harmony <version> <edition>/Harmony <version> <edition>.app/Contents/tba/resources/help`",
+        ]
+    return "\n".join(lines)
+
+
 def get_available_classes() -> List[dict]:
     """Get list of all available API classes with descriptions from annotated.html.
 
-    Returns:
-        List of dicts with 'name' and 'description' keys.
+    Raises:
+        HarmonyPathError: if annotated.html is missing or unparseable. Resources
+        catch this and surface a readable message rather than an empty list,
+        so misconfiguration never looks like "Harmony has zero classes".
     """
     script_path = get_script_path()
     annotated_file = script_path / "annotated.html"
 
     if not annotated_file.exists():
-        return []
+        raise HarmonyPathError(f"annotated.html not found at {annotated_file}")
 
-    try:
-        html_content = annotated_file.read_text(encoding="utf-8")
-        soup = BeautifulSoup(html_content, 'html.parser')
+    html_content = annotated_file.read_text(encoding="utf-8")
+    soup = BeautifulSoup(html_content, "html.parser")
 
-        classes = []
+    table = soup.find("table", class_="directory")
+    if not table:
+        raise HarmonyPathError(
+            f"annotated.html at {annotated_file} has no <table class='directory'> — "
+            "Harmony help format may have changed."
+        )
 
-        # Find all table rows in the class list
-        table = soup.find('table', class_='directory')
-        if not table:
-            return []
+    h = html2text.HTML2Text()
+    h.ignore_links = True
+    h.ignore_images = True
+    h.ignore_emphasis = False
+    h.body_width = 0
 
-        for row in table.find_all('tr'):
-            # Find the class name link
-            link = row.find('a', class_='el')
-            if not link:
-                continue
+    classes = []
+    for row in table.find_all("tr"):
+        link = row.find("a", class_="el")
+        if not link:
+            continue
+        class_name = link.get_text(strip=True)
+        desc_td = row.find("td", class_="desc")
+        description = h.handle(str(desc_td)).strip() if desc_td else ""
+        classes.append({"name": class_name, "description": description})
 
-            class_name = link.get_text(strip=True)
-
-            # Find the description
-            desc_td = row.find('td', class_='desc')
-            if desc_td:
-                # Convert HTML to text
-                h = html2text.HTML2Text()
-                h.ignore_links = True
-                h.ignore_images = True
-                h.ignore_emphasis = False
-                h.body_width = 0
-                description = h.handle(str(desc_td)).strip()
-            else:
-                description = ""
-
-            classes.append({
-                'name': class_name,
-                'description': description
-            })
-
-        return sorted(classes, key=lambda x: x['name'].lower())
-
-    except Exception as e:
-        return []
+    return sorted(classes, key=lambda x: x["name"].lower())
 
 
 @mcp.resource("harmony://api/classes")
@@ -102,11 +165,20 @@ def get_classes() -> str:
 
     Returns a list of class names and brief descriptions that can be queried for full documentation.
     """
-    classes = get_available_classes()
+    try:
+        classes = get_available_classes()
+    except HarmonyPathError as e:
+        return (
+            f"# Harmony API not available\n\n{e}\n\n"
+            f"Run `harmony://config/diagnostics` for details."
+        )
 
     if not classes:
-        script_path = get_script_path()
-        return f"No classes found. Please check that the script path exists: {script_path}"
+        return (
+            "# No classes found\n\n"
+            "annotated.html was readable but contained no class entries. "
+            "See `harmony://config/diagnostics` for paths."
+        )
 
     # Return as formatted list with descriptions
     result = f"# Available Harmony API Classes ({len(classes)} total)\n\n"
@@ -139,52 +211,60 @@ def get_class_documentation(class_name: str) -> str:
     script_path = get_script_path()
 
     if not script_path.exists():
-        return f"Error: Script path does not exist: {script_path}"
+        return (
+            f"Harmony API not available: script path does not exist ({script_path}).\n"
+            f"Run `harmony://config/diagnostics` for details."
+        )
 
-    # Construct the filename: class{ClassName}.html
     html_file = script_path / f"class{class_name}.html"
 
     if not html_file.exists():
-        # Try to find similar class names for helpful error message
-        available = get_available_classes()
-        similar = [c for c in available if class_name.lower() in c['name'].lower()]
+        try:
+            available = get_available_classes()
+        except HarmonyPathError:
+            available = []
+        similar = [c for c in available if class_name.lower() in c["name"].lower()]
 
-        error_msg = f"Error: Class '{class_name}' not found.\n\n"
+        lines = [f"Error: Class '{class_name}' not found."]
         if similar:
-            error_msg += f"Did you mean one of these?\n"
-            error_msg += "\n".join(f"  - {c['name']}: {c['description'][:80]}..." if len(c['description']) > 80 else f"  - {c['name']}: {c['description']}" for c in similar[:5])
+            lines.append("\nDid you mean one of these?")
+            for c in similar[:5]:
+                desc = c["description"]
+                if len(desc) > 80:
+                    desc = desc[:80] + "..."
+                lines.append(f"  - {c['name']}: {desc}" if desc else f"  - {c['name']}")
         else:
-            error_msg += f"Use harmony://api/classes to see all available classes."
+            lines.append("\nUse harmony://api/classes to see all available classes.")
+        return "\n".join(lines)
 
-        return error_msg
-
-    # Read and process the HTML content
+    # OSError surfaces if the file is unreadable; UnicodeDecodeError if the
+    # encoding assumption breaks. Both are bugs we want to see, not swallow.
     try:
         html_content = html_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        return f"Error reading {html_file.name}: {e}"
 
-        # Parse HTML with BeautifulSoup
-        soup = BeautifulSoup(html_content, 'html.parser')
+    soup = BeautifulSoup(html_content, "html.parser")
+    doc_content = soup.find("div", id="doc-content")
+    if not doc_content:
+        return (
+            f"Harmony class page format unexpected: no <div id='doc-content'> in {html_file.name}. "
+            f"Run `harmony://config/diagnostics` if this is widespread."
+        )
 
-        # Extract only the doc-content div
-        doc_content = soup.find('div', id='doc-content')
+    h = html2text.HTML2Text()
+    h.ignore_links = False
+    h.ignore_images = True
+    h.ignore_emphasis = False
+    h.body_width = 0
 
-        if not doc_content:
-            # Fallback if doc-content div not found
-            return f"Warning: Could not find documentation content in {html_file}"
+    return f"# {class_name} Class Documentation\n\n{h.handle(str(doc_content))}"
 
-        # Convert HTML to clean markdown/text
-        h = html2text.HTML2Text()
-        h.ignore_links = False
-        h.ignore_images = True
-        h.ignore_emphasis = False
-        h.body_width = 0  # Don't wrap lines
 
-        clean_text = h.handle(str(doc_content))
-
-        return f"# {class_name} Class Documentation\n\n{clean_text}"
-
-    except Exception as e:
-        return f"Error reading file {html_file}: {str(e)}"
+@mcp.resource("harmony://config/diagnostics")
+def get_diagnostics() -> str:
+    """Report which configured paths exist and whether the server is usable."""
+    return "# Harmony Context — Diagnostics\n\n" + _format_diagnostics(validate_harmony_paths())
 
 
 @mcp.resource("harmony://config/scripts-demo-path")
@@ -224,10 +304,12 @@ def search_api(query: str) -> str:
     Args:
         query: Keyword or concept to search for
     """
-    classes = get_available_classes()
+    try:
+        classes = get_available_classes()
+    except HarmonyPathError as e:
+        return f"Harmony API not available: {e}\nRun `harmony://config/diagnostics` for details."
     if not classes:
-        script_path = get_script_path()
-        return f"No classes available. Check that script path exists: {script_path}"
+        return "No classes parsed from annotated.html — see `harmony://config/diagnostics`."
 
     query_lower = query.lower()
     matches = [
@@ -298,4 +380,10 @@ def get_script_demo(script_name: str) -> str:
 
 
 if __name__ == "__main__":
+    # MCP uses stdout for protocol traffic — never print diagnostics there.
+    import sys
+
+    report = validate_harmony_paths()
+    print(_format_diagnostics(report), file=sys.stderr)
+    print("", file=sys.stderr)
     mcp.run()

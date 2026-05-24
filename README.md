@@ -23,8 +23,10 @@ The MCP Harmony Context server exposes Harmony's API documentation through the M
 
 - **API Class Discovery**: Browse all available Harmony API classes with descriptions
 - **Class Documentation**: Get detailed documentation for any Harmony API class
-- **Demo Scripts Access**: Access to Harmony's Script API demo files
-- **Clean Markdown Output**: HTML documentation converted to readable markdown format
+- **Search**: Keyword search across class names and descriptions (`search_api` tool)
+- **Demo Scripts Access**: Browse and read Harmony's Script API demo `.js` files
+- **Diagnostics**: `harmony://config/diagnostics` reports which configured paths exist
+- **Works without a local Harmony install**: mirror the public docs with the bundled `scripts/fetch_harmony_docs.py`
 
 ---
 
@@ -72,37 +74,58 @@ pip install -r requirements.txt
 pip install "mcp[cli]>=1.18.0" python-dotenv beautifulsoup4 html2text
 ```
 
-### 4. Configure Harmony help path
+### 4. Configure the Harmony help path
 
-The server needs to know where your Harmony help documentation is located.
+The server reads documentation HTML from a `help/` folder. You have two options:
 
-**Option 1: .env File (recomended)**
+#### Option A — Point at your local Harmony install
 
-Create a `.env` file in the project root:
+If Harmony is installed, set `HARMONY_HELP_PATH` to its `help/` directory.
 
-```bash
-HARMONY_HELP_PATH=C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help
-```
+| OS | Typical path |
+| --- | --- |
+| macOS | `/Applications/Toon Boom Harmony <version> <edition>/Harmony <version> <edition>.app/Contents/tba/resources/help` |
+| Windows | `C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony <version> <edition>\help` |
+| Linux | `/opt/ToonBoomAnimation/harmony/resources/help` |
 
-**Default Path**: If not configured, the server defaults to:
-`C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help`
+On macOS the default auto-discovers any `Toon Boom Harmony*` app under `/Applications/`. On other OSes you usually need to set `HARMONY_HELP_PATH` explicitly.
 
----
-
-**Option 2: Environment Variable**
-
-Set the `HARMONY_HELP_PATH` environment variable:
+The simplest config is a `.env` file in the project root:
 
 ```bash
-# Windows (Command Prompt)
-set HARMONY_HELP_PATH=C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help
-
-# Windows (PowerShell)
-$env:HARMONY_HELP_PATH="C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help"
-
-# macOS/Linux
-export HARMONY_HELP_PATH="/Applications/Toon Boom Harmony/help"
+HARMONY_HELP_PATH=/Applications/Toon Boom Harmony 25.2 Premium/Harmony 25.2 Premium.app/Contents/tba/resources/help
 ```
+
+Or export it inline:
+
+```bash
+# macOS / Linux
+export HARMONY_HELP_PATH="/Applications/Toon Boom Harmony 25.2 Premium/Harmony 25.2 Premium.app/Contents/tba/resources/help"
+
+# Windows PowerShell
+$env:HARMONY_HELP_PATH = "C:\Program Files (x86)\Toon Boom Animation\Toon Boom Harmony 25 Essentials\help"
+```
+
+#### Option B — Mirror the public docs (no Harmony install required)
+
+If you don't have Harmony locally, download the public scripting reference:
+
+```bash
+uv run scripts/fetch_harmony_docs.py            # Harmony 25 (default)
+uv run scripts/fetch_harmony_docs.py --version 22
+```
+
+This mirrors `https://docs.toonboom.com/help/harmony-<version>/scripting/script/` into `./harmony-help/script/` (~5 MB, ~130 class pages, gitignored). Then point `.env` at it:
+
+```bash
+HARMONY_HELP_PATH=/absolute/path/to/mcp-harmony-context/harmony-help
+```
+
+Demo scripts (`extended/ScriptAPIDemos/`) are not in the online docs — they ship only with Harmony itself.
+
+#### Verify your configuration
+
+On startup the server prints a diagnostic banner to stderr showing whether each required path resolved. You can also query it any time via the `harmony://config/diagnostics` resource.
 
 ## Usage
 
@@ -132,22 +155,35 @@ This will open an interactive interface where you can explore available resource
 
 ### Integrating with Claude Desktop
 
-To use this MCP server with Claude Desktop, add it to your Claude configuration file:
+Add the server to your Claude Desktop config:
 
-**On macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**On Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+macOS example:
 
 ```json
 {
   "mcpServers": {
     "harmony-context": {
       "command": "uv",
-      "args": [
-        "--directory",
-        "/path/to/mcp-harmony-context",
-        "run",
-        "main.py"
-      ],
+      "args": ["--directory", "/absolute/path/to/mcp-harmony-context", "run", "main.py"],
+      "env": {
+        "HARMONY_HELP_PATH": "/Applications/Toon Boom Harmony 25.2 Premium/Harmony 25.2 Premium.app/Contents/tba/resources/help"
+      }
+    }
+  }
+}
+```
+
+Windows example:
+
+```json
+{
+  "mcpServers": {
+    "harmony-context": {
+      "command": "uv",
+      "args": ["--directory", "C:\\path\\to\\mcp-harmony-context", "run", "main.py"],
       "env": {
         "HARMONY_HELP_PATH": "C:\\Program Files (x86)\\Toon Boom Animation\\Toon Boom Harmony 25 Essentials\\help"
       }
@@ -156,7 +192,7 @@ To use this MCP server with Claude Desktop, add it to your Claude configuration 
 }
 ```
 
-Replace `/path/to/mcp-harmony-context` with the actual path to your cloned repository.
+Replace the `--directory` path with your clone, and `HARMONY_HELP_PATH` with either your Harmony install or the path printed by `scripts/fetch_harmony_docs.py`.
 
 ### Using with Other MCP Clients
 
@@ -166,59 +202,37 @@ This server follows the standard MCP protocol and can be integrated with any MCP
 
 ## Available Resources
 
-Once the server is running, the following resources are available:
+| Resource | Purpose |
+| --- | --- |
+| `harmony://api/classes` | List every Harmony API class with descriptions |
+| `harmony://api/class/{class_name}` | Full documentation for a specific class (e.g. `scene`, `Action`, `Color`) |
+| `harmony://config/diagnostics` | Report which configured paths exist; first thing to check when something looks wrong |
+| `harmony://config/scripts-demo-path` | Configured path to Harmony's `ScriptAPIDemos/` folder |
 
-### `harmony://api/classes`
+## Available Tools
 
-Returns a list of all available Harmony API classes with their descriptions.
-
-**Example Response:**
-
-```markdown
-# Available Harmony API Classes (150+ total)
-
-## Action
-The Action class provides methods for manipulating actions in Harmony...
-
-## Color
-The Color class provides methods for working with colors...
-```
-
-### `harmony://api/class/{class_name}`
-
-Returns detailed documentation for a specific API class.
-
-**Example:** `harmony://api/class/scene`
-
-**Example Response:**
-
-```markdown
-# scene Class Documentation
-
-Detailed documentation including:
-- Class description
-- Methods and their signatures
-- Method parameters and return types
-- Usage examples
-```
-
-### `harmony://config/scripts-demo-path`
-
-Returns the configured path to Harmony's Script API demo files.
+| Tool | Purpose |
+| --- | --- |
+| `get_class_docs(class_name)` | Same content as `harmony://api/class/{class_name}`, callable as a tool |
+| `search_api(query)` | Keyword search across class names and descriptions |
+| `list_demo_scripts()` | List every `.js` file under `ScriptAPIDemos/` |
+| `get_script_demo(script_name)` | Read a specific demo script as fenced JavaScript |
 
 ---
 
 ## Project Structure
 
-```
+```text
 mcp-harmony-context/
-├── main.py              # Main MCP server implementation
-├── pyproject.toml       # Project dependencies and metadata
-├── uv.lock              # Locked dependency versions
-├── LICENSE              # MIT License
-├── README.md            # This file
-├── CLAUDE.md            # Development guidance for Claude Code
-└── .env                 # Environment configuration (create from .env.example)
+├── main.py                          # MCP server
+├── scripts/fetch_harmony_docs.py    # Mirror the public docs locally
+├── tests/                           # Pytest suite + fixture HTML
+├── pyproject.toml                   # Dependencies and pytest config
+├── uv.lock                          # Locked dependency versions
+├── LICENSE
+├── README.md
+├── CLAUDE.md                        # Notes for Claude Code
+└── .env                             # HARMONY_HELP_PATH (gitignored)
 ```
 
 ---
@@ -229,14 +243,33 @@ mcp-harmony-context/
 
 - Python 3.12+
 - uv package manager
-- Toon Boom Harmony installed
+- Either Toon Boom Harmony installed, or run `scripts/fetch_harmony_docs.py` to mirror the public docs
 
 ### Setup for Development
 
 1. Clone the repository
-2. Run `uv sync` to install dependencies
-3. Configure your `HARMONY_HELP_PATH`
-4. Run `mcp dev main.py` to test interactively
+2. Run `uv sync` to install dependencies (`uv sync --dev` to include pytest)
+3. Configure `HARMONY_HELP_PATH` (see "Configure the Harmony help path" above)
+4. Run `mcp dev main.py` to inspect resources and tools interactively
+
+### Running tests
+
+```bash
+uv run pytest
+```
+
+Tests use fixture HTML under `tests/fixtures/help/` and do **not** require a Harmony install.
+
+### Smoke-test checklist
+
+When picking the project up after a while or on a new machine:
+
+- [ ] `uv sync --dev` succeeds
+- [ ] `uv run pytest` is green
+- [ ] `uv run main.py` prints `**Status:** OK` in its startup banner
+- [ ] `mcp dev main.py` lists `harmony://api/classes`, `harmony://api/class/{class_name}`, `harmony://config/diagnostics`
+- [ ] `harmony://api/classes` returns ≥100 classes for a Harmony 25 install/mirror
+- [ ] `harmony://api/class/scene` includes a `setStopFrame` mention
 
 ### Code Structure
 

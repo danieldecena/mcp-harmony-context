@@ -41,20 +41,28 @@ Sky_Gold #F5C842 | Grass_Rich #7A9E4E
 Home_Warm #E8D5B0 | Lamp_Glow #FFE0A0
 
 ## Harmony API rules
+
 ### USE THESE
 - scene.setStopFrame(1440)
-- Timeline.addDTLayer("name", "READ")
-- PaletteObjectManager.createScenePalette("name")
+- node.add("Top", "name", "READ", x, y, z)         // adds a Read layer; Timeline picks it up
+- PaletteObjectManager.getScenePaletteList(scene.currentScene()).createPalette("name", 0)
 - node.setAsDefaultCamera(nodePath)
 - node.type(nodePath)
+- node.setTextAttr(nodePath, "ATTR", frame, value) // setAttr does NOT exist; use setTextAttr
 - Drawing.create(columnName, drawingName)
 - MessageLog.trace("message")
 
-### NEVER USE (does not exist)
+### NEVER USE (does not exist in Harmony 25 docs)
 - DrawingTools.createLayers()
 - scene.setDefaultCamera()
 - scene.setMarkerComment()
 - node.getNodePath()
+- Timeline.addDTLayer()                  // use node.add() instead
+- PaletteObjectManager.createScenePalette()  // use getScenePaletteList(...).createPalette()
+- node.setAttr()                         // use node.setTextAttr() with arg order (path, attr, frame, value)
+
+Validate any new script with:
+    uv run scripts/validate_harmony_api.py harmony-scripts
 
 ## Done criteria
 1. MiloMasterRun.js runs with zero errors

@@ -1,8 +1,12 @@
 
 
 *.pyc
+__pycache__/
 
 .claude/
 .mcp.json
 .env
 harmony-help/
+
+# OS
+.DS_Store

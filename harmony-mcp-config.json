@@ -1,0 +1,14 @@
+{
+  "harmony-context": {
+    "command": "uv",
+    "args": [
+      "--directory",
+      "~/Developer/sandbox/mcp-harmony-context",
+      "run",
+      "main.py"
+    ],
+    "env": {
+      "HARMONY_HELP_PATH": "/Applications/Toon Boom Harmony 25.2 Premium/Harmony 25.2 Premium.app/Contents/tba/resources/help"
+    }
+  }
+}

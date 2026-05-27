@@ -1,0 +1,50 @@
+#!/bin/bash
+# MILO PROJECT LAUNCHER
+# Usage: milo          → opens 1 terminal
+#        milo rig      → opens rig terminal
+#        milo bg       → opens backgrounds terminal
+#        milo master   → opens masterrun terminal
+#        milo all      → opens all 3 in iTerm2
+
+PROJECT="$HOME/Developer/sandbox/mcp-harmony-context"
+
+case "$1" in
+  rig)
+    echo "🐾 Opening Milo RIG terminal..."
+    osascript -e "tell app \"iTerm2\" to create window with default profile command \"cd $PROJECT && claude --message 'Work only on MiloSetup.js and MiloRig.js. Read CLAUDE.md first.'\""
+    ;;
+  bg)
+    echo "🐾 Opening Milo BACKGROUNDS terminal..."
+    osascript -e "tell app \"iTerm2\" to create window with default profile command \"cd $PROJECT && claude --message 'Work only on MiloBackgrounds. Read CLAUDE.md first.'\""
+    ;;
+  master)
+    echo "🐾 Opening Milo MASTERRUN terminal..."
+    osascript -e "tell app \"iTerm2\" to create window with default profile command \"cd $PROJECT && claude --message 'Work only on MiloMasterRun.js final assembly. Read CLAUDE.md first.'\""
+    ;;
+  all)
+    echo "🐾 Opening all 3 Milo terminals..."
+    osascript << 'EOF'
+tell application "iTerm2"
+  -- Window 1: Rig
+  set w1 to (create window with default profile)
+  tell current session of w1
+    write text "cd ~/Developer/sandbox/mcp-harmony-context && claude"
+  end tell
+  -- Window 2: Backgrounds
+  set w2 to (create window with default profile)
+  tell current session of w2
+    write text "cd ~/Developer/sandbox/mcp-harmony-context && claude"
+  end tell
+  -- Window 3: Master
+  set w3 to (create window with default profile)
+  tell current session of w3
+    write text "cd ~/Developer/sandbox/mcp-harmony-context && claude"
+  end tell
+end tell
+EOF
+    ;;
+  *)
+    echo "🐾 Opening Milo project..."
+    cd "$PROJECT" && claude
+    ;;
+esac

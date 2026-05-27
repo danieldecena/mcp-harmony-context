@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Milo Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f3; color: #1a1a1a; padding: 24px; max-width: 780px; margin: 0 auto; }
+h1 { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+.sub { font-size: 13px; color: #666; margin-bottom: 20px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 0.5px solid #ddd; background: transparent; color: #666; cursor: pointer; }
+.tab.active { background: #fff; color: #1a1a1a; border-color: #bbb; }
+.section-title { font-size: 11px; font-weight: 500; color: #999; letter-spacing: 0.08em; text-transform: uppercase; margin: 16px 0 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.cmd-card { background: #fff; border: 0.5px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: background 0.1s; }
+.cmd-card:hover { background: #f0f0ee; }
+.cmd-label { font-size: 13px; font-weight: 500; font-family: monospace; color: #1a1a1a; }
+.cmd-desc { font-size: 12px; color: #888; margin-top: 3px; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-top: 5px; font-weight: 500; }
+.tag-milo { background: #EEEDFE; color: #3C3489; }
+.tag-claude { background: #E6F1FB; color: #0C447C; }
+.tag-project { background: #E1F5EE; color: #085041; }
+.tag-shell { background: #F1EFE8; color: #444441; }
+.search-wrap { position: relative; margin-bottom: 12px; }
+.search-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #aaa; }
+.search-wrap input { width: 100%; padding: 8px 12px 8px 32px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
+.checklist { background: #fff; border: 0.5px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+.check-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 0.5px solid #f0f0ee; cursor: pointer; }
+.check-item:last-child { border-bottom: none; }
+.check-item.done .check-label { color: #bbb; text-decoration: line-through; }
+.check-box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #ccc; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; background: #fff; }
+.check-box.checked { background: #534AB7; border-color: #534AB7; }
+.check-label { font-size: 13px; }
+.check-sub { font-size: 11px; color: #aaa; margin-top: 2px; }
+.progress-bar { height: 4px; background: #eee; border-radius: 2px; margin-bottom: 16px; }
+.progress-fill { height: 100%; background: #534AB7; border-radius: 2px; transition: width 0.3s; }
+.progress-label { font-size: 12px; color: #888; margin-bottom: 6px; }
+.api-item { background: #fff; border: 0.5px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-family: monospace; font-size: 12px; margin-bottom: 6px; cursor: pointer; }
+.api-item:hover { background: #f0f0ee; }
+.api-item.bad { color: #c0392b; background: #fff8f7; border-color: #f5c6c6; cursor: default; }
+
+/* CD HELPER */
+.cd-card { background: #fff; border: 0.5px solid #e0e0e0; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.cd-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; }
+.cd-header:hover { background: #f8f8f6; }
+.cd-name { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.cd-alias { font-size: 11px; font-family: monospace; background: #EEEDFE; color: #3C3489; padding: 2px 7px; border-radius: 4px; }
+.cd-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.cd-status.ok { background: #E1F5EE; color: #085041; }
+.cd-status.warn { background: #FAEEDA; color: #633806; }
+.cd-body { border-top: 0.5px solid #f0f0ee; padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.2s ease; }
+.cd-body.open { max-height: 300px; }
+.cd-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 0.5px solid #f8f8f6; }
+.cd-row:last-child { border-bottom: none; }
+.cd-row-label { font-size: 12px; color: #666; }
+.cd-path { font-size: 12px; font-family: monospace; color: #444; flex: 1; margin: 0 8px; word-break: break-all; }
+.copy-btn { font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 0.5px solid #ddd; background: #fff; cursor: pointer; color: #666; white-space: nowrap; }
+.copy-btn:hover { background: #f0f0ee; }
+.cd-command { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #f8f8f6; border-top: 0.5px solid #f0f0ee; }
+.cd-command code { font-size: 12px; font-family: monospace; color: #1a1a1a; flex: 1; }
+.cd-command button { font-size: 11px; padding: 4px 10px; border-radius: 5px; border: 0.5px solid #ddd; background: #fff; cursor: pointer; }
+.cd-command button:hover { background: #534AB7; color: #fff; border-color: #534AB7; }
+
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; display: none; z-index: 99; }
+</style>
+</head>
+<body>
+
+<h1>🐾 Milo Animation</h1>
+<p class="sub">Command hub · click any card to copy</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('commands')">commands</button>
+  <button class="tab" onclick="switchTab('cd')">cd helper</button>
+  <button class="tab" onclick="switchTab('checklist')">checklist</button>
+  <button class="tab" onclick="switchTab('harmony')">harmony api</button>
+</div>
+
+<!-- COMMANDS TAB -->
+<div id="tab-commands">
+  <div class="search-wrap">
+    <i class="ti ti-search"></i>
+    <input type="search" placeholder="search commands..." oninput="filterCmds(this.value)">
+  </div>
+  <div id="cmd-grid"></div>
+</div>
+
+<!-- CD HELPER TAB -->
+<div id="tab-cd" style="display:none">
+  <div class="section-title">click a project to see where to cd</div>
+  <div id="cd-list"></div>
+</div>
+
+<!-- CHECKLIST TAB -->
+<div id="tab-checklist" style="display:none">
+  <p class="progress-label" id="progress-label">0 of 8 complete</p>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  <div class="checklist" id="checklist"></div>
+</div>
+
+<!-- HARMONY API TAB -->
+<div id="tab-harmony" style="display:none">
+  <div class="section-title">use these</div>
+  <div class="api-item" onclick="copy('scene.setStopFrame(1440)')">scene.setStopFrame(1440)</div>
+  <div class="api-item" onclick="copy('Timeline.addDTLayer(name, READ)')">Timeline.addDTLayer("name", "READ")</div>
+  <div class="api-item" onclick="copy('node.setAsDefaultCamera(nodePath)')">node.setAsDefaultCamera(nodePath)</div>
+  <div class="api-item" onclick="copy('Drawing.create(columnName, drawingName)')">Drawing.create(columnName, drawingName)</div>
+  <div class="api-item" onclick="copy('PaletteObjectManager.createScenePalette(name)')">PaletteObjectManager.createScenePalette("name")</div>
+  <div class="api-item" onclick="copy('MessageLog.trace(message)')">MessageLog.trace("message")</div>
+  <div class="section-title">never use — doesn't exist</div>
+  <div class="api-item bad">DrawingTools.createLayers() ✗</div>
+  <div class="api-item bad">scene.setDefaultCamera() ✗</div>
+  <div class="api-item bad">scene.setMarkerComment() ✗</div>
+  <div class="api-item bad">node.getNodePath() ✗</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const cmds = [
+  { cmd:"milo", desc:"open milo project in claude code", tag:"milo" },
+  { cmd:"milo-rig", desc:"claude code — rig work only", tag:"milo" },
+  { cmd:"milo-bg", desc:"claude code — backgrounds only", tag:"milo" },
+  { cmd:"milo-master", desc:"claude code — masterrun assembly", tag:"milo" },
+  { cmd:"milo-goal", desc:"print full spec to terminal", tag:"milo" },
+  { cmd:"milo-dir", desc:"cd to milo project folder", tag:"milo" },
+  { cmd:"milo-dash", desc:"open this dashboard", tag:"milo" },
+  { cmd:"claude", desc:"open claude code in current dir", tag:"claude" },
+  { cmd:"cc", desc:"alias for claude", tag:"claude" },
+  { cmd:"cwork", desc:"switch to main claude account", tag:"claude" },
+  { cmd:"cpersonal", desc:"switch to personal account", tag:"claude" },
+  { cmd:"/init", desc:"scan project + create CLAUDE.md", tag:"claude" },
+  { cmd:"/clear", desc:"clear conversation, keep context", tag:"claude" },
+  { cmd:"/compact", desc:"summarize long conversations", tag:"claude" },
+  { cmd:"/cost", desc:"see token usage this session", tag:"claude" },
+  { cmd:"ccfinance", desc:"claude code — finance project", tag:"project" },
+  { cmd:"ccadops", desc:"claude code — adops project", tag:"project" },
+  { cmd:"ccvault", desc:"claude code — obsidian vault", tag:"project" },
+  { cmd:"ccjobs", desc:"claude code — job hub", tag:"project" },
+  { cmd:"reload", desc:"source ~/.zshrc", tag:"shell" },
+  { cmd:"ll", desc:"file list with icons (eza)", tag:"shell" },
+  { cmd:"vault", desc:"cd to obsidian vault", tag:"shell" },
+  { cmd:"z <dir>", desc:"jump to any visited directory", tag:"shell" },
+];
+
+const projects = [
+  {
+    name: "Milo Animation",
+    alias: "milo",
+    status: "ok",
+    path: "~/Developer/sandbox/mcp-harmony-context",
+    fullPath: "/Users/daniel/Developer/sandbox/mcp-harmony-context",
+    steps: [
+      { label: "open project", cmd: "milo" },
+      { label: "rig work", cmd: "milo-rig" },
+      { label: "backgrounds", cmd: "milo-bg" },
+      { label: "masterrun", cmd: "milo-master" },
+    ],
+    note: "Scripts go to: ~/Library/Preferences/Toon Boom Animation/Toon Boom Harmony Premium/2500-scripts/"
+  },
+  {
+    name: "Finance",
+    alias: "ccfinance",
+    status: "ok",
+    path: "~/Obsidian Cloud/Developer/Projects/finance",
+    fullPath: "/Users/daniel/Obsidian Cloud/Developer/Projects/finance",
+    steps: [
+      { label: "open project", cmd: "ccfinance" },
+      { label: "run app", cmd: "finance" },
+      { label: "run api", cmd: "finance-api" },
+    ],
+    note: null
+  },
+  {
+    name: "Job Hub",
+    alias: "ccjobs",
+    status: "ok",
+    path: "~/Obsidian Cloud/Projects/job-hub",
+    fullPath: "/Users/daniel/Obsidian Cloud/Projects/job-hub",
+    steps: [
+      { label: "open project", cmd: "ccjobs" },
+      { label: "scout leads", cmd: "job scout" },
+      { label: "apply to job", cmd: "job apply <url>" },
+    ],
+    note: null
+  },
+  {
+    name: "Campaign Tools (AdOps)",
+    alias: "ccadops",
+    status: "ok",
+    path: "~/Obsidian Cloud/Developer/Projects/campaign-tools",
+    fullPath: "/Users/daniel/Obsidian Cloud/Developer/Projects/campaign-tools",
+    steps: [
+      { label: "open project", cmd: "ccadops" },
+      { label: "pacing check", cmd: "pacing" },
+      { label: "promo summary", cmd: "promo-summary" },
+    ],
+    note: null
+  },
+  {
+    name: "Obsidian Vault",
+    alias: "vault",
+    status: "ok",
+    path: "~/Obsidian Cloud",
+    fullPath: "/Users/daniel/Obsidian Cloud",
+    steps: [
+      { label: "open vault", cmd: "vault" },
+      { label: "open claude code", cmd: "ccvault" },
+      { label: "sync vault", cmd: "vault-sync" },
+    ],
+    note: null
+  },
+  {
+    name: "Harmony Scripts",
+    alias: "milo-dir",
+    status: "ok",
+    path: "~/Library/Preferences/Toon Boom Animation/Toon Boom Harmony Premium/2500-scripts",
+    fullPath: "/Users/daniel/Library/Preferences/Toon Boom Animation/Toon Boom Harmony Premium/2500-scripts",
+    steps: [
+      { label: "go to scripts", cmd: "cd ~/Library/Preferences/Toon\\ Boom\\ Animation/Toon\\ Boom\\ Harmony\\ Premium/2500-scripts" },
+      { label: "list scripts", cmd: "ll" },
+    ],
+    note: "This is where MiloMasterRun.js lives — Harmony reads from here"
+  },
+];
+
+const checks = [
+  { label:"MiloSetup — layers + palette", sub:"12 layers, 16 colors in Milo_Colors" },
+  { label:"MiloRig — pivot points", sub:"head, body, legs, ears, tail" },
+  { label:"MiloDrawings — stub + instructions", sub:"manual drawing notes in console" },
+  { label:"MiloExpressions — 8 expression maps", sub:"eyes + wrinkles + mouth combos" },
+  { label:"MiloCamera — correct API", sub:"node.setAsDefaultCamera()" },
+  { label:"MiloSceneVisibility — 3 scenes", sub:"frames 1-360, 361-1200, 1201-1440" },
+  { label:"MiloBackgrounds — stub + color notes", sub:"per-scene color instructions" },
+  { label:"MiloMasterRun — zero errors", sub:"final message: MILO SCENE READY" },
+];
+
+let checkState = JSON.parse(localStorage.getItem('milo-checks') || 'null') || checks.map(() => false);
+if (checkState.length !== checks.length) checkState = checks.map(() => false);
+
+function tagClass(t) {
+  return { milo:'tag-milo', claude:'tag-claude', project:'tag-project', shell:'tag-shell' }[t];
+}
+
+function renderCmds(filter) {
+  const grid = document.getElementById('cmd-grid');
+  const f = (filter||'').toLowerCase();
+  const filtered = f ? cmds.filter(c => c.cmd.includes(f)||c.desc.includes(f)||c.tag.includes(f)) : cmds;
+  const groups = {};
+  const order = ['milo','claude','project','shell'];
+  filtered.forEach(c => { if (!groups[c.tag]) groups[c.tag] = []; groups[c.tag].push(c); });
+  const names = { milo:'milo project', claude:'claude code', project:'other projects', shell:'shell' };
+  grid.innerHTML = '';
+  order.filter(t => groups[t]).forEach(tag => {
+    const sec = document.createElement('div');
+    sec.innerHTML = `<div class="section-title">${names[tag]}</div><div class="grid"></div>`;
+    const g = sec.querySelector('.grid');
+    groups[tag].forEach(c => {
+      const el = document.createElement('div');
+      el.className = 'cmd-card';
+      el.onclick = () => copy(c.cmd);
+      el.innerHTML = `<div class="cmd-label">${c.cmd}</div><div class="cmd-desc">${c.desc}</div><span class="tag ${tagClass(c.tag)}">${c.tag}</span>`;
+      g.appendChild(el);
+    });
+    grid.appendChild(sec);
+  });
+}
+
+function renderCdHelper() {
+  const list = document.getElementById('cd-list');
+  list.innerHTML = '';
+  projects.forEach((p, idx) => {
+    const card = document.createElement('div');
+    card.className = 'cd-card';
+    const cdCmd = `cd ${p.path}`;
+    card.innerHTML = `
+      <div class="cd-header" onclick="toggleCd(${idx})">
+        <div class="cd-name">
+          <i class="ti ti-folder" style="color:#888;font-size:16px"></i>
+          ${p.name}
+          <span class="cd-alias">${p.alias}</span>
+        </div>
+        <span class="cd-status ${p.status}">${p.status === 'ok' ? '✅ exists' : '⚠️ check path'}</span>
+      </div>
+      <div class="cd-body" id="cd-body-${idx}">
+        <div class="cd-row">
+          <span class="cd-row-label">path</span>
+          <span class="cd-path">${p.path}</span>
+          <button class="copy-btn" onclick="copy('${p.fullPath}')">copy</button>
+        </div>
+        <div class="cd-command">
+          <code>${cdCmd}</code>
+          <button onclick="copy('${cdCmd}')">copy cd</button>
+        </div>
+        ${p.steps.map(s => `
+        <div class="cd-row">
+          <span class="cd-row-label">${s.label}</span>
+          <span class="cd-path">${s.cmd}</span>
+          <button class="copy-btn" onclick="copy('${s.cmd}')">copy</button>
+        </div>`).join('')}
+        ${p.note ? `<div style="padding:8px 14px;font-size:11px;color:#888;border-top:0.5px solid #f0f0ee;background:#fafaf8">${p.note}</div>` : ''}
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function toggleCd(idx) {
+  const body = document.getElementById('cd-body-' + idx);
+  body.classList.toggle('open');
+}
+
+function renderChecklist() {
+  const list = document.getElementById('checklist');
+  list.innerHTML = '';
+  checks.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'check-item' + (checkState[i] ? ' done' : '');
+    el.onclick = () => {
+      checkState[i] = !checkState[i];
+      try { localStorage.setItem('milo-checks', JSON.stringify(checkState)); } catch(e) {}
+      renderChecklist();
+    };
+    el.innerHTML = `<div class="check-box ${checkState[i]?'checked':''}"><i class="ti ti-check" style="font-size:11px;color:white;display:${checkState[i]?'block':'none'}"></i></div><div><div class="check-label">${c.label}</div><div class="check-sub">${c.sub}</div></div>`;
+    list.appendChild(el);
+  });
+  const done = checkState.filter(Boolean).length;
+  document.getElementById('progress-label').textContent = `${done} of ${checks.length} complete`;
+  document.getElementById('progress-fill').style.width = Math.round(done/checks.length*100)+'%';
+}
+
+function copy(text) {
+  navigator.clipboard.writeText(text).catch(()=>{});
+  const t = document.getElementById('toast');
+  t.textContent = 'copied: ' + text;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 1500);
+}
+
+function filterCmds(val) { renderCmds(val.toLowerCase()); }
+
+function switchTab(name) {
+  ['commands','cd','checklist','harmony'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===name?'block':'none';
+  });
+  document.querySelectorAll('.tab').forEach((el,i) => {
+    el.classList.toggle('active', ['commands','cd','checklist','harmony'][i]===name);
+  });
+}
+
+renderCmds();
+renderCdHelper();
+renderChecklist();
+</script>
+</body>
+</html>
